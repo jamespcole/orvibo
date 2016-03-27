@@ -114,7 +114,7 @@ if ir is not None:
 The same code works to grab/emit signal from remotes with 433MHz radio frequency.
 
 #### Keeping connection to Orvibo device
-'''python
+```python
 device = Orvibo('192.168.1.37')
 device.keep_connection = True
 try:
@@ -127,4 +127,4 @@ try:
 finally:
    # Ask device to close connection.
    device.close()
-'''
+```
