@@ -121,18 +121,23 @@ import socket
 
 device = Orvibo('192.168.1.45')
 device.keep_connection = True
+
+def blink_socket(device):
+    try:
+        device.on = not device.on
+    except socket.error:
+        # Reset connection to device    
+        device.keep_connection = True
+
 try:
     # Note: now socket errors are handled by user!
    
     # Blink the socket ^_^
     for i in range(5):
-        device.on = not device.on
+        blink_socket(device)
 
     # You also may stop using connection anytime
     # device.keep_connection = False
-except socket.error:
-    # Reset connection to device    
-    device.keep_connection = True
 finally:
     # Connection must be closed explicitly.
     # via
