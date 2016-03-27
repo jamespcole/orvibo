@@ -261,7 +261,7 @@ class Orvibo(object):
             if self.__subscribe(self.__socket) is None:
                 raise OrviboException('Connection subscription error.')
         else:
-            self.__socket = None
+            self.close()
 
     def __repr__(self):
         mac = binascii.hexlify(bytearray(self.mac))
