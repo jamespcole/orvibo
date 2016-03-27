@@ -2,7 +2,8 @@
 # @file orvibo.py
 # @author cherezov.pavel@gmail.com
 
-__version__ = "1.0"
+# keep_connection branch
+__version__ = "1.0.1"
 
 from contextlib import contextmanager
 import logging
@@ -91,16 +92,31 @@ def _parse_discover_response(response):
 
     return (type, mac)
 
-@contextmanager
-def _orvibo_socket():
+def _create_orvibo_socket(ip=''):
+    """ Creates socket to talk with Orvibo devices.
+
+    Arguments:
+    ip - ip address of the Orvibo device or empty string in case of broadcasting discover packet.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    for opt in [socket.SO_BROADCAST, socket.SO_REUSEADDR,socket.SO_BROADCAST]:
+    for opt in [socket.SO_BROADCAST, socket.SO_REUSEADDR, socket.SO_BROADCAST]:
         sock.setsockopt(socket.SOL_SOCKET, opt, 1)
-    sock.bind(('', PORT))
+    if ip:
+        sock.connect((ip, PORT))
+    else:
+        sock.bind((ip, PORT))
+    return sock
+
+@contextmanager
+def _orvibo_socket(external_socket = None):
+    sock = _create_orvibo_socket() if external_socket is None else external_socket
 
     yield sock
 
-    sock.close()
+    if external_socket is None:
+        sock.close()
+    else:
+        pass
 
 
 class Packet:
@@ -214,12 +230,38 @@ class Orvibo(object):
         self.mac = mac
         self.__last_subscr_time = time.time() - 1 # Orvibo doesn't like subscriptions frequently that 1 in 0.1sec
         self.__logger = logging.getLogger('{}@{}'.format(self.__class__.__name__, ip))
+        self.__socket = None
 
         if self.mac is None:
             self.__logger.debug('MAC address is not provided. Discovering..')
             d = Orvibo.discover(self.ip)
             self.mac = d.mac
             self.type = d.type
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self.__socket is not None:
+            self.__socket.close()
+            self.__socket = None
+
+    @property
+    def keep_connection(self):
+        """ Keeps connection to the Orvibe device.
+        """
+        return self.__socket is not None
+
+    @keep_connection.setter
+    def keep_connection(self, value):
+        """ Keeps connection to the Orvibe device.
+        """
+        if value:
+            self.__socket = _create_orvibo_socket(self.ip)
+            if self.__subscribe(self.__socket) is None:
+                raise OrviboException('Connection subscription error.')
+        else:
+            self.__socket = None
 
     def __repr__(self):
         mac = binascii.hexlify(bytearray(self.mac))
@@ -263,7 +305,7 @@ class Orvibo(object):
             return devices
 
         if ip not in devices.keys():
-            raise OrviboException('Device ip={} not found.'.format(ip))
+            raise OrviboException('Device ip={} not found in {}'.format(ip, devices.keys()))
 
         return Orvibo(*devices[ip])
 
@@ -272,7 +314,7 @@ class Orvibo(object):
 
         returns -- last response byte, which represents device state
         """
-        with _orvibo_socket() as s:
+        with _orvibo_socket(self.__socket) as s:
             return self.__subscribe(s)
 
     def __subscribe(self, s):
@@ -305,7 +347,7 @@ class Orvibo(object):
         returns -- True if switch success, otherwise False
         """
 
-        with _orvibo_socket() as s:
+        with _orvibo_socket(self.__socket) as s:
             curr_state = self.__subscribe(s)
 
             if self.type != Orvibo.TYPE_SOCKET:
@@ -318,7 +360,7 @@ class Orvibo(object):
 
             state = ON if switchOn else OFF
             if curr_state == state:
-                self.__logger.warn('No need to switch {0} device which is already switched {0}'.format('on' if switchOn else 'off'))
+                self.__logger.warn('No need to switch {0} device which has already switched {0}'.format('on' if switchOn else 'off'))
                 return False
 
             self.__logger.debug('Socket is switching {}'.format('on' if switchOn else 'off'))
@@ -373,7 +415,7 @@ class Orvibo(object):
         returns -- byte string with IR/RD433 signal
         """
 
-        with _orvibo_socket() as s:
+        with _orvibo_socket(self.__socket) as s:
             if self.__subscribe(s) is None:
                 self.__logger.warn('Subscription failed while entering to Learning IR/RF433 mode')
                 return
@@ -444,7 +486,7 @@ class Orvibo(object):
         returns -- True if emit successs, otherwise False
         """
 
-        with _orvibo_socket() as s:
+        with _orvibo_socket(self.__socket) as s:
             if self.__subscribe(s) is None:
                 self.__logger.warn('Subscription failed while emiting IR/RF433 signal')
                 return False
