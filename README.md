@@ -112,3 +112,18 @@ if ir is not None:
     # device.emit(ir)
 ```
 The same code works to grab/emit signal from remotes with 433MHz radio frequency.
+
+#### Keeping connection to Orvibo device
+'''
+device = Orvibo('192.168.1.37')
+device.keep_connection = True
+try:
+   # Note: it is up to user handling socket errors now!
+   
+   # Blink the socket :)
+   device.on = not device.on
+   device.on = not device.on
+   device.on = not device.on
+finally:
+   # Ask device to close connection.
+   device.close()
