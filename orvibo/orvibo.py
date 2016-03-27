@@ -243,8 +243,13 @@ class Orvibo(object):
 
     def close(self):
         if self.__socket is not None:
-            self.__socket.close()
-            self.__socket = None
+            try:
+                self.__socket.close()
+            except socket.error:
+                # Socket seems not alive.
+                pass
+            finally:
+                self.__socket = None
 
     @property
     def keep_connection(self):
@@ -256,12 +261,13 @@ class Orvibo(object):
     def keep_connection(self, value):
         """ Keeps connection to the Orvibe device.
         """
+        # Clean connection first if alive.
+        self.close()
+
         if value:
             self.__socket = _create_orvibo_socket(self.ip)
             if self.__subscribe(self.__socket) is None:
                 raise OrviboException('Connection subscription error.')
-        else:
-            self.close()
 
     def __repr__(self):
         mac = binascii.hexlify(bytearray(self.mac))
