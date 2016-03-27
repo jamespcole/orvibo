@@ -134,7 +134,7 @@ except socket.error:
     # Reset connection to device    
     device.keep_connection = True
 finally:
-    # Connction must be closed explicitely.
+    # Connection must be closed explicitly.
     # via
     device.close()
     # or via
